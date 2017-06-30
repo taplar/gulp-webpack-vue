@@ -13,11 +13,32 @@ var webpack = require( 'webpack' );
 var production = false;
 var rootPath = path.resolve( './' );
 
-function buildForProduction ( callback ) {
-	production = true;
 
-	return runSequence( 'development-nowatch', callback );
-}
+gulp.task( 'build', callback => runSequence( 'build-styles', 'build-scripts', 'build-static', callback ) );
+gulp.task( 'build-js-vendor', bundleJavascript );
+gulp.task( 'build-scripts', callback => runSequence( 'build-vue', 'build-js-vendor', callback ) );
+gulp.task( 'build-static', copyStaticFilesToBuild );
+gulp.task( 'build-styles', compileLess );
+gulp.task( 'build-vue', compileVue );
+gulp.task( 'clean', callback => runSequence( 'clean-styles', 'clean-scripts', 'clean-static', callback ) );
+gulp.task( 'clean-scripts', deleteAllScriptFiles );
+gulp.task( 'clean-server', deleteAllServerFiles );
+gulp.task( 'clean-static', deleteAllServerFiles );
+gulp.task( 'clean-styles', deleteAllStyleFiles );
+gulp.task( 'development', callback => runSequence( 'clean', 'build', 'deploy', callback ) );
+gulp.task( 'development-watch', callback => runSequence( 'development', 'watch', callback ) );
+gulp.task( 'deploy', callback => runSequence( 'deploy-styles', 'deploy-scripts', 'deploy-static', callback ) );
+gulp.task( 'deploy-scripts', copyScriptFilesToServer );
+gulp.task( 'deploy-static', copyStaticFilesToServer );
+gulp.task( 'deploy-styles', copyStyleFilesToServer );
+gulp.task( 'mark-as-production', callback => { production = true; callback(); } );
+gulp.task( 'production', callback => runSequence( 'mark-as-productoin', 'clean', 'build', 'deploy', callback ) );
+gulp.task( 'production-watch', callback => runSequence( 'production', 'watch', callback ) );
+gulp.task( 'watch', callback => runSequence( 'watch-styles', 'watch-scripts', 'watch-static', callback ) );
+gulp.task( 'watch-styles', watchStyles );
+gulp.task( 'watch-scripts', watchScripts );
+gulp.task( 'watch-static', watchStatic );
+
 
 function bundleJavascript () {
 	var environment = ( production ? 'production' : 'development' );
@@ -31,7 +52,7 @@ function bundleJavascript () {
 	return gulp
 		.src( filepaths )
 		.pipe( concat( 'all.js' ) )
-		.pipe( gulp.dest( rootPath +'/build/public/scripts/src/' ) );
+		.pipe( gulp.dest( rootPath +'/build/scripts/public/scripts/src/' ) );
 }
 
 function compileLess () {
@@ -53,24 +74,32 @@ function compileLess () {
 		.pipe( concat( 'all.less' ) )
 		.pipe( less( options ).on( 'error', handleError ) )
 		.pipe( concat( 'all.css' ) )
-		.pipe( gulp.dest( rootPath +'/build/public/styles/' ) );
+		.pipe( gulp.dest( rootPath +'/build/styles/public/styles/' ) );
 }
 
-function compileVue () {
+function compileVue ( callback ) {
 	webpack( require( rootPath +'/webpack.config.js' ), ( err, stats ) => {
 		if ( err ) throw new util.PluginError( 'webpack', err );
 
 		gulp
-			.src( rootPath +'/build/public/scripts/src/application.js' )
+			.src( rootPath +'/build/scripts/public/scripts/src/application.js' )
 			.pipe( minify() )
-			.pipe( gulp.dest( rootPath +'/build/public/scripts/src' ) );
+			.pipe( gulp.dest( rootPath +'/build/scripts/public/scripts/src' ) );
+		
+		callback();
     } );
 }
 
-function copyBuildFilesToServer () {
+function copyFilesToServer ( subdirectory ) {
+	var baseFilePath = rootPath +'/build/'+ subdirectory;
+
 	return gulp
-		.src( [ rootPath +'/build/**/*.*', rootPath +'/build/**/.*' ], { base: 'build' } )
+		.src( [ baseFilePath +'/**/*.*', baseFilePath +'/**/.*' ], { base: 'build/'+ subdirectory } )
 		.pipe( gulp.dest( rootPath +'/server' ) );
+}
+
+function copyScriptFilesToServer () {
+	return copyFilesToServer( 'scripts' );
 }
 
 function copyStaticFilesToBuild () {
@@ -86,20 +115,31 @@ function copyStaticFilesToBuild () {
 
 	return gulp
 		.src( filepaths, { base: 'repo' } )
-		.pipe( gulp.dest( rootPath +'/build/' ) );
+		.pipe( gulp.dest( rootPath +'/build/static/' ) );
 }
 
-function deleteAllBuiltAndDeployedFiles () {
-	var filepaths = [
-		rootPath +'/build/**',
-		rootPath +'/build/**/.*',
-		'!'+ rootPath +'/build',
-		rootPath +'/server/**',
-		rootPath +'/server/**/.*',
-		'!'+ rootPath +'/server'
-	];
+function copyStaticFilesToServer () {
+	return copyFilesToServer( 'static' );
+}
 
-	return del( filepaths );
+function copyStyleFilesToServer () {
+	return copyFilesToServer( 'styles' );
+}
+
+function deleteAllScriptFiles () {
+	return del( [ rootPath +'/build/scripts' ] );
+}
+
+function deleteAllServerFiles () {
+	return del( [ rootPath +'/server/**/*', rootPath +'/server/**/*.*', rootPath +'/server/**/.*' ] );
+}
+
+function deleteAllStaticFiles () {
+	return del( [ rootPath +'/build/static' ] );
+}
+
+function deleteAllStyleFiles () {
+	return del( [ rootPath +'/build/styles' ] );
 }
 
 function handleError ( error ) {
@@ -107,15 +147,29 @@ function handleError ( error ) {
 	this.emit( 'end' );
 }
 
-gulp.task( 'build', callback => runSequence( 'build-css', 'build-vue', 'build-js-vendor', 'build-other', callback ) );
-gulp.task( 'build-css', compileLess );
-gulp.task( 'build-js-vendor', bundleJavascript );
-gulp.task( 'build-other', copyStaticFilesToBuild );
-gulp.task( 'build-vue', compileVue );
-gulp.task( 'clean', deleteAllBuiltAndDeployedFiles );
-gulp.task( 'default', callback => runSequence( 'development', callback ) );
-gulp.task( 'deploy', copyBuildFilesToServer );
-gulp.task( 'development', callback => runSequence( 'development-nowatch', 'watch', callback ) );
-gulp.task( 'development-nowatch', callback => runSequence( 'clean', 'build', 'deploy', callback ) );
-gulp.task( 'production', buildForProduction );
-gulp.task( 'watch', () => gulp.watch( [ 'repo/**/*', 'repo/**/.*', 'repo/**/*.*' ], () => runSequence( 'development-nowatch' ) ) );
+function watchScripts () {
+	return gulp.watch( [ rootPath +'/repo/public/scripts/**/*.*' ], () => runSequence( 'clean-server', 'clean-scripts', 'build-scripts', 'deploy' ) );
+}
+
+function watchStatic () {
+	var filepaths = [
+		rootPath +'/repo/**/*.*'
+		, rootPath +'/repo/**/.*'
+		, '!'+ rootPath +'/repo/**/*.babel'
+		, '!'+ rootPath +'/repo/**/*.vue'
+		, '!'+ rootPath +'/repo/**/*.js'
+		, '!'+ rootPath +'/repo/**/*.less'
+		, '!'+ rootPath +'/repo/**/*.css'
+	];
+
+	return gulp.watch( filepaths, () => runSequence( 'clean-server', 'clean-static', 'build-static', 'deploy' ) );
+}
+
+function watchStyles () {
+	var filepaths = [
+		rootPath +'/repo/public/styles/**/*.*'
+		, '!'+ rootPath +'/repo/public/styles/vendor'
+	];
+
+	return gulp.watch( filepaths, () => runSequence( 'clean-server', 'clean-styles', 'build-styles', 'deploy' ) )
+}
