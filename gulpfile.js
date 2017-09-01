@@ -32,7 +32,7 @@ gulp.task( 'deploy-scripts', copyScriptFilesToServer );
 gulp.task( 'deploy-static', copyStaticFilesToServer );
 gulp.task( 'deploy-styles', copyStyleFilesToServer );
 gulp.task( 'mark-as-production', callback => { production = true; callback(); } );
-gulp.task( 'production', callback => runSequence( 'mark-as-productoin', 'clean', 'build', 'deploy', callback ) );
+gulp.task( 'production', callback => runSequence( 'mark-as-production', 'clean', 'build', 'deploy', callback ) );
 gulp.task( 'production-watch', callback => runSequence( 'production', 'watch', callback ) );
 gulp.task( 'watch', callback => runSequence( 'watch-styles', 'watch-scripts', 'watch-static', callback ) );
 gulp.task( 'watch-styles', watchStyles );
@@ -47,6 +47,7 @@ function bundleJavascript () {
 		, rootPath +'/repo/public/scripts/vendor/'+ environment +'/**/*.*'
 		, rootPath +'/repo/public/scripts/src/**/*.js'
 		, '!'+ rootPath +'/repo/public/scripts/src/application.js'
+		, '!'+ rootPath +'/repo/public/scripts/src/dataModel.js'
 	];
 
 	return gulp
@@ -78,7 +79,9 @@ function compileLess () {
 }
 
 function compileVue ( callback ) {
-	webpack( require( rootPath +'/webpack.config.js' ), ( err, stats ) => {
+	var environment = ( production ? '.production' : '' );
+
+	webpack( require( rootPath +'/webpack'+ environment +'.config.js' ), ( err, stats ) => {
 		if ( err ) throw new util.PluginError( 'webpack', err );
 
 		gulp
