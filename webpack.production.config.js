@@ -19,6 +19,7 @@ module.exports = {
 		alias: {
 			'vue$': path.resolve(__dirname, './node_modules/vue/dist/vue.esm.js')
 			, 'vuex$': path.resolve(__dirname, './node_modules/vuex/dist/vuex.esm.js')
+			, 'vue-resource$': path.resolve(__dirname, './node_modules/vue-resource/dist/vue-resource.min.js')
 		}
 	},
 	performance: {
